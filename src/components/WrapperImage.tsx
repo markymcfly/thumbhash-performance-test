@@ -1,6 +1,29 @@
 // src/components/WrapperImage.tsx
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { thumbHashToDataURL } from 'thumbhash';
+
+const STYLE_ID = 'thumbhash-placeholder-styles';
+const injectedHashes = new Set<string>();
+
+function getOrCreateStyleElement(): HTMLStyleElement {
+  let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = STYLE_ID;
+    document.head.appendChild(el);
+  }
+  return el;
+}
+
+function injectThumbHashRule(thumbHash: string, dataUrl: string): void {
+  if (injectedHashes.has(thumbHash)) return;
+  injectedHashes.add(thumbHash);
+  const escapedHash = thumbHash.replace(/\\/g, '\\\\').replace(/"/g, '\\22');
+  const safeUrl = dataUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const rule = `.thumb-wrapper[data-thumbhash="${escapedHash}"]::before { background-image: url("${safeUrl}"); }`;
+  const styleEl = getOrCreateStyleElement();
+  styleEl.sheet?.insertRule(rule, styleEl.sheet.cssRules.length);
+}
 
 interface WrapperImageProps {
   thumbHash: string;
@@ -18,9 +41,16 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
+function addLoadedWithRaf(setLoaded: (v: boolean) => void) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => setLoaded(true));
+  });
+}
+
 export function WrapperImage({ thumbHash, alt, imageUrl, onRenderComplete }: WrapperImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [placeholderUrl, setPlaceholderUrl] = useState<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useLayoutEffect(() => {
     const start = performance.now();
@@ -35,35 +65,39 @@ export function WrapperImage({ thumbHash, alt, imageUrl, onRenderComplete }: Wra
     }
   }, [thumbHash, onRenderComplete]);
 
+  useLayoutEffect(() => {
+    if (placeholderUrl) {
+      injectThumbHashRule(thumbHash, placeholderUrl);
+    }
+  }, [thumbHash, placeholderUrl]);
+
+  useLayoutEffect(() => {
+    if (!imageUrl) return;
+    const img = imgRef.current;
+    if (img?.complete && img.naturalHeight !== 0) {
+      addLoadedWithRaf(setLoaded);
+    }
+  }, [imageUrl, placeholderUrl]);
+
+  const handleImageLoad = () => {
+    addLoadedWithRaf(setLoaded);
+  };
+
   return (
     <div
-      className="relative aspect-[4/3] overflow-hidden bg-gray-200"
-      style={{
-        '--placeholder-url': placeholderUrl ? `url(${placeholderUrl})` : 'none',
-      } as React.CSSProperties}
+      className={`thumb-wrapper aspect-[4/3] ${loaded ? 'loaded' : ''}`}
+      data-thumbhash={thumbHash}
     >
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: 'var(--placeholder-url)',
-          backgroundSize: 'cover',
-          filter: 'blur(20px)',
-          transform: 'scale(1.1)',
-          opacity: isLoaded ? 0 : 1,
-          transition: 'opacity 300ms',
-        }}
-      />
-
-      {imageUrl && (
+      {imageUrl ? (
         <img
+          ref={imgRef}
+          className="thumb-image"
           src={imageUrl}
           alt={alt}
           loading="lazy"
-          onLoad={() => setIsLoaded(true)}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ opacity: isLoaded ? 1 : 0, transition: 'opacity 300ms' }}
+          onLoad={handleImageLoad}
         />
-      )}
+      ) : null}
     </div>
   );
 }

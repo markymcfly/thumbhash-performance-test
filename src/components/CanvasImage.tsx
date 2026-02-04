@@ -64,7 +64,7 @@ export function CanvasImage({ thumbHash, alt, imageUrl, onRenderComplete }: Canv
   };
 
   return (
-    <div className="relative aspect-[4/3] overflow-hidden bg-gray-200">
+    <div className="relative aspect-[4/3] overflow-hidden">
       {showCanvas && (
         <canvas
           ref={canvasRef}

@@ -1,73 +1,74 @@
-# React + TypeScript + Vite
+# ThumbHash Performance Test
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Compare two ways of rendering [ThumbHash](https://evanw.github.io/thumbhash/) placeholders in React: **Canvas** (pixel buffer) vs **CSS wrapper** (`::before` + background-image). The app measures decode/render time for each approach and shows the real image once loaded.
 
-Currently, two official plugins are available:
+![Demo](demo.gif)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## How it works
 
-## React Compiler
+1. **Canvas**: Decode ThumbHash → RGBA pixels → draw on `<canvas>` with `putImageData`. Placeholder is a real canvas element.
+2. **Wrapper**: Decode ThumbHash → Data URL (base64 PNG) → set as `background-image` on a `::before` pseudo-element via injected CSS. Placeholder is pure CSS.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Both then load the full image and fade from placeholder to image. The test records how long the decode/placeholder step takes per image and aggregates (total, average, min, max).
 
-## Expanding the ESLint configuration
+## How to use
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **Run the app**
+   ```bash
+   npm install
+   npm run dev
+   ```
+2. **Run a test**
+   - Set image count (10–500).
+   - Click **Test Canvas** or **Test ::before**.
+   - Results appear below; images stay visible after the run.
+3. **Compare**
+   Run both tests to see the winner and difference in ms.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Code examples: difference between the two approaches
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Approach A: Canvas
+
+Decode to raw pixels and draw them on a canvas. No CSS image, no base64 string—just a pixel buffer.
+
+```tsx
+import { thumbHashToRGBA } from 'thumbhash';
+
+// 1. Decode hash → width, height, RGBA buffer
+const bytes = base64ToBytes(thumbHash);
+const { w, h, rgba } = thumbHashToRGBA(bytes);
+
+// 2. Draw on canvas
+const ctx = canvas.getContext('2d');
+canvas.width = w;
+canvas.height = h;
+const imageData = ctx.createImageData(w, h);
+imageData.data.set(rgba);
+ctx.putImageData(imageData, 0, 0);
+
+// 3. Placeholder = <canvas> (blur/scale via CSS)
+return <canvas ref={canvasRef} style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }} />;
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Approach B: Wrapper (::before)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Decode to a Data URL string and use it as a CSS background. The placeholder is a `::before` pseudo-element, not a DOM node.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```tsx
+import { thumbHashToDataURL } from 'thumbhash';
+
+// 1. Decode hash → Data URL (base64 PNG string)
+const bytes = base64ToBytes(thumbHash);
+const dataUrl = thumbHashToDataURL(bytes);
+
+// 2. Apply to ::before via injected CSS (can't set ::before from inline style)
+// e.g. .thumb-wrapper[data-thumbhash="..."]::before { background-image: url("..."); }
+injectRule(`.thumb-wrapper[data-thumbhash="${hash}"]::before { background-image: url("${dataUrl}"); }`);
+
+// 3. Placeholder = ::before (blur/scale in CSS); no extra DOM node
+return <div className="thumb-wrapper" data-thumbhash={hash}><img src={imageUrl} /></div>;
 ```
+
+**Summary:** Canvas = decode to pixels → draw on `<canvas>`. Wrapper = decode to Data URL → use as `background-image` on `::before`.

@@ -18,7 +18,7 @@ interface TestResults {
 
 export function PerformanceTest() {
   const [testMethod, setTestMethod] = useState<TestMethod>(null);
-  const [imageCount, setImageCount] = useState(100);
+  const [imageCount, setImageCount] = useState(250);
   const [canvasResults, setCanvasResults] = useState<TestResults | null>(null);
   const [wrapperResults, setWrapperResults] = useState<TestResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -47,7 +47,7 @@ export function PerformanceTest() {
       }
 
       setIsRunning(false);
-      setTestMethod(null);
+      // setTestMethod(null); //uncomment this leave the images visible after the test
     }, 1000); // Wait 1s for all renders
   };
 
@@ -96,9 +96,9 @@ export function PerformanceTest() {
   const imagesToRender = SAMPLE_IMAGES.slice(0, imageCount);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-gray-600 text-4xl font-bold mb-2">ThumbHash Performance Test</h1>
+    <div className="min-h-screen w-full bg-gray-100 p-6 flex justify-center">
+      <div className="w-full max-w-7xl">
+        <h1 className="text-gray-600 text-4xl font-bold mb-6">Thumbhash Performance Test</h1>
 
         {/* Controls */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -106,7 +106,7 @@ export function PerformanceTest() {
 
           <div className="flex items-center gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-6">
                 Anzahl Bilder: {imageCount}
               </label>
               <input
@@ -126,7 +126,7 @@ export function PerformanceTest() {
             <button
               onClick={() => startTest('canvas')}
               disabled={isRunning}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+              className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
             >
               {isRunning && testMethod === 'canvas' ? 'Testing Canvas...' : 'Test Canvas'}
             </button>
@@ -134,7 +134,7 @@ export function PerformanceTest() {
             <button
               onClick={() => startTest('wrapper')}
               disabled={isRunning}
-              className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+              className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
             >
               {isRunning && testMethod === 'wrapper' ? 'Testing ::before...' : 'Test ::before'}
             </button>
@@ -142,7 +142,7 @@ export function PerformanceTest() {
             <button
               onClick={clearResults}
               disabled={isRunning}
-              className="bg-gray-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+              className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
             >
               Clear Results
             </button>
